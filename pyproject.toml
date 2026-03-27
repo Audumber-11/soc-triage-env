@@ -1,0 +1,29 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "soc-triage-env"
+version = "1.0.0"
+description = "SOC Alert Triage OpenEnv for training AI agents"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi>=0.104.0",
+    "uvicorn[standard]>=0.24.0",
+    "pydantic>=2.5.0",
+    "requests>=2.31.0",
+    "openai>=1.0.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = ["pytest", "black", "isort"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["server", "."]
+
+[tool.openenv]
+name = "soc-triage-env"
+version = "1.0.0"
+app_port = 8000
+app_file = "server/app.py"

@@ -7,32 +7,20 @@ RUN apt-get update && apt-get install -y \
     gcc \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy requirements
-COPY server/requirements.txt .
+# Copy requirements first (better caching)
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy source code
-COPY models.py .
-COPY baseline.py .
-COPY server/environment.py server/
-COPY server/app.py server/
-
-# Create __init__ files
-touch __init__.py
-touch server/__init__.py
+# Copy all source files
+COPY . .
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV PORT=8000
-ENV WORKERS=4
-ENV MAX_CONCURRENT_ENVS=100
+ENV PORT=7860
+ENV WORKERS=1
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
-
-# Expose port
-EXPOSE 8000
+# Expose port (HF Spaces uses 7860)
+EXPOSE 7860
 
 # Run server
-CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

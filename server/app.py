@@ -40,7 +40,7 @@ environments: Dict[str, SOCTriageEnvironment] = {}
 
 # Request/Response Models
 class ResetRequest(BaseModel):
-    task_difficulty: str = "easy"
+    task_difficulty: Optional[str] = "easy"
 
 
 class StepRequest(BaseModel):

@@ -19,7 +19,7 @@ ENV PYTHONPATH=/app
 ENV PORT=7860
 ENV WORKERS=1
 
-# Expose port (HF Spaces uses 7860)
+# Expose port (HF Spaces standard)
 EXPOSE 7860
 
 # Run server

@@ -17,7 +17,7 @@ from openai import OpenAI
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
 # Environment URL (adjust for HF Spaces deployment)
-BASE_URL = os.environ.get("ENV_URL", "http://localhost:8000")
+BASE_URL = os.environ.get("ENV_URL", "https://audumber11-soc-triage-env.hf.space")
 
 
 def classify_with_llm(alert: Dict[str, Any]) -> str:

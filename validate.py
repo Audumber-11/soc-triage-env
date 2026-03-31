@@ -104,7 +104,7 @@ def main():
     # Test grader endpoint
     print("6. Testing grader endpoint...")
     if "easy" in session_ids:
-        passed, data = check_endpoint("/grader", "post", {}, 200)
+        passed, data = check_endpoint(f"/grader?session_id={session_ids['easy']}", "post", {}, 200)
         if passed:
             score = data.get("score")
             if score is not None and 0.0 <= score <= 1.0:

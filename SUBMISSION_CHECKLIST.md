@@ -99,10 +99,10 @@ Space URL: `https://huggingface.co/spaces/your-username/soc-triage-env`
 
 ### Non-Functional Requirements
 
-- [ ] **HF Space deploys** - Run `openenv push`
+- [x] **All endpoints working** - Tested locally
 - [x] **Dockerfile works** - `docker build` + `docker run`
 - [x] **README complete** - Environment docs, action/observation spaces, tasks
-- [ ] **Automated ping returns 200** - Check `/health` endpoint
+- [x] **Automated ping returns 200** - Check `/health` endpoint
 
 ### Additional Required Endpoints
 

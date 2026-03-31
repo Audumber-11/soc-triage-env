@@ -23,16 +23,15 @@ touch server/__init__.py
 
 # Set environment variables
 ENV PYTHONPATH=/app
-ENV PORT=8000
-ENV WORKERS=4
-ENV MAX_CONCURRENT_ENVS=100
+ENV PORT=7860
+ENV WORKERS=1
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-    CMD python -c "import requests; requests.get('http://localhost:8000/health')" || exit 1
+    CMD python -c "import requests; requests.get('http://localhost:7860/health')" || exit 1
 
-# Expose port
-EXPOSE 8000
+# Expose port (HF Spaces standard)
+EXPOSE 7860
 
 # Run server
-CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
+CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]

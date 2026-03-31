@@ -40,7 +40,7 @@ def check_openenv_yaml():
 
     try:
         import yaml
-        with open("openenv.yaml", "r") as f:
+        with open("openenv.yaml", "r", encoding='utf-8') as f:
             config = yaml.safe_load(f)
     except Exception as e:
         print_check("openenv.yaml parsing", False, str(e))
@@ -152,7 +152,7 @@ def check_dockerfile():
     if not exists:
         return False
 
-    with open(dockerfile_path) as f:
+    with open(dockerfile_path, encoding='utf-8') as f:
         content = f.read()
 
     required = ["FROM", "WORKDIR", "COPY", "EXPOSE", "CMD"]
@@ -180,7 +180,7 @@ def check_baseline_script():
     if not exists:
         return False
 
-    with open(baseline_path) as f:
+    with open(baseline_path, encoding='utf-8') as f:
         content = f.read()
 
     checks = [
@@ -270,7 +270,7 @@ def check_hf_spaces_config():
     # Check openenv.yaml has HF config
     try:
         import yaml
-        with open("openenv.yaml") as f:
+        with open("openenv.yaml", encoding='utf-8') as f:
             config = yaml.safe_load(f)
 
         has_hf = "app_port" in config or "app_file" in config or "hf_spaces" in str(config)
@@ -292,7 +292,7 @@ def check_readme():
     if not exists:
         return False
 
-    with open(readme_path) as f:
+    with open(readme_path, encoding='utf-8') as f:
         content = f.read()
 
     required_sections = [

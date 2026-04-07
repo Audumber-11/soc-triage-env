@@ -7,8 +7,7 @@ import json
 import subprocess
 from typing import Dict, Any, Optional
 from datetime import datetime
-
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from openai import OpenAI
@@ -40,7 +39,8 @@ environments: Dict[str, SOCTriageEnvironment] = {}
 
 # Request/Response Models
 class ResetRequest(BaseModel):
-    task_difficulty: Optional[str] = "easy"
+    difficulty: Optional[str] = "easy"
+    task_difficulty: Optional[str] = None  # Support both field names
 
 
 class StepRequest(BaseModel):
@@ -48,30 +48,30 @@ class StepRequest(BaseModel):
     action: Dict[str, Any]
 
 
-class TaskResponse(BaseModel):
-    name: str
-    difficulty: str
-    description: str
-    max_steps: int
-    num_alerts: int
-    scoring_criteria: str
-
-
-class ActionSchema(BaseModel):
-    action_type: str
-    description: str
-    parameters: Dict[str, str]
+class GraderRequest(BaseModel):
+    session_id: str
 
 
 # Core OpenEnv Endpoints
 @app.post("/reset")
-async def reset(request: ResetRequest):
+async def reset(request: Request):
     """
     Reset environment for new episode.
     Required OpenEnv endpoint.
+    Accepts both JSON body and empty body (defaults to easy).
     """
     try:
-        difficulty = TaskDifficulty(request.task_difficulty.lower())
+        # Try to parse JSON body
+        try:
+            body = await request.json()
+            req_data = ResetRequest(**body)
+            # Support both difficulty and task_difficulty
+            difficulty_str = req_data.difficulty or req_data.task_difficulty or "easy"
+        except Exception:
+            # Empty body or invalid JSON - default to easy
+            difficulty_str = "easy"
+
+        difficulty = TaskDifficulty(difficulty_str.lower())
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid difficulty. Use: easy, medium, hard")
 
@@ -241,17 +241,37 @@ async def get_tasks():
 
 
 @app.post("/grader")
-async def grader(session_id: str):
+async def grader(request: Request):
     """
     Return grader score after episode completion.
     Required for hackathon.
     Returns score between 0.0-1.0.
+    Accepts both query params and JSON body.
     """
+    session_id = None
+
+    # Try to get from query params first
+    try:
+        session_id = request.query_params.get("session_id")
+    except:
+        pass
+
+    # If not in query params, try JSON body
+    if not session_id:
+        try:
+            body = await request.json()
+            session_id = body.get("session_id")
+        except:
+            pass
+
+    if not session_id:
+        raise HTTPException(status_code=400, detail="Missing session_id parameter")
+
     if session_id not in environments:
         raise HTTPException(status_code=404, detail="Session not found")
 
     env = environments[session_id]
-    
+
     # Use current score directly
     score = float(env._env_state.current_score)
 
@@ -276,78 +296,69 @@ async def baseline():
     Required for hackathon.
     """
     try:
-        import requests
-        
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key:
-            return {
-                "status": "error",
-                "error": "OPENAI_API_KEY not set",
-                "scores": {"easy": 0.0, "medium": 0.0, "hard": 0.0}
-            }
-        
-        BASE_URL = "https://audumber11-soc-triage-env.hf.space"
-        
-        scores = {}
-        
-        # Run easy episode
+        # Run the inference script
+        result = subprocess.run(
+            ["python", "inference.py"],
+            capture_output=True,
+            text=True,
+            timeout=1200,  # 20 minute timeout
+            cwd=os.getcwd()
+        )
+
+        # Parse the output to find the JSON result
+        stdout = result.stdout
+        stderr_output = result.stderr
+
+        # Look for FINAL_OUTPUT or JSON in output
+        scores = {"easy": 0.0, "medium": 0.0, "hard": 0.0}
+
+        # Try to parse from stdout
         try:
-            resp = requests.post(f"{BASE_URL}/reset", json={"task_difficulty": "easy"}, timeout=30)
-            session_id = resp.json().get("session_id")
-            
-            for _ in range(5):
-                resp = requests.post(f"{BASE_URL}/reset", json={"task_difficulty": "easy"}, timeout=30)
-                data = resp.json()
-                session_id = data.get("session_id")
-                alerts = data.get("observation", {}).get("alerts", [])
-                if not alerts:
-                    break
-                    
-                # Classify with LLM
-                import openai
-                client = OpenAI(api_key=api_key)
-                alert = alerts[0]
-                
-                resp = client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[{"role": "user", "content": f"Classify as false_positive, low, medium, or high: {alert.get('alert_type')}"}],
-                    max_tokens=20
-                )
-                classification = resp.choices[0].message.content.strip().lower()
-                if "false" in classification:
-                    classification = "false_positive"
-                elif classification not in ["false_positive", "low", "medium", "high"]:
-                    classification = "medium"
-                
-                requests.post(f"{BASE_URL}/step", json={"session_id": session_id, "action": {"action_type": "classify_alert", "alert_id": alert["alert_id"], "classification": classification}}, timeout=30)
-            
-            resp = requests.post(f"{BASE_URL}/grader?session_id={session_id}", timeout=30)
-            scores["easy"] = resp.json().get("score", 0.0)
+            # Look for the final output marker
+            if "FINAL_OUTPUT:" in stdout:
+                json_start = stdout.find("FINAL_OUTPUT:") + len("FINAL_OUTPUT:")
+                json_str = stdout[json_start:].strip()
+                # Find the end of the JSON object
+                brace_count = 0
+                json_end = 0
+                for i, char in enumerate(json_str):
+                    if char == '{':
+                        brace_count += 1
+                    elif char == '}':
+                        brace_count -= 1
+                        if brace_count == 0:
+                            json_end = i + 1
+                            break
+                if json_end > 0:
+                    parsed = json.loads(json_str[:json_end])
+                    if "scores" in parsed:
+                        scores = parsed["scores"]
+                    else:
+                        scores = parsed
         except Exception as e:
-            scores["easy"] = 0.0
-        
-        # Run medium episode
-        try:
-            resp = requests.post(f"{BASE_URL}/reset", json={"task_difficulty": "medium"}, timeout=30)
-            scores["medium"] = resp.json().get("current_score", 0.0)
-        except:
-            scores["medium"] = 0.0
-            
-        # Run hard episode  
-        try:
-            resp = requests.post(f"{BASE_URL}/reset", json={"task_difficulty": "hard"}, timeout=30)
-            scores["hard"] = resp.json().get("current_score", 0.0)
-        except:
-            scores["hard"] = 0.0
-        
+            print(f"Error parsing baseline output: {e}")
+
+        # Validate scores
+        validated_scores = {
+            "easy": max(0.0, min(1.0, float(scores.get("easy", 0.0)))),
+            "medium": max(0.0, min(1.0, float(scores.get("medium", 0.0)))),
+            "hard": max(0.0, min(1.0, float(scores.get("hard", 0.0))))
+        }
+
         return {
             "status": "success",
-            "scores": scores,
-            "average": round(sum(scores.values()) / 3, 4),
+            "scores": validated_scores,
+            "average": round(sum(validated_scores.values()) / 3, 4),
             "timestamp": datetime.utcnow().isoformat(),
-            "model": "gpt-4o-mini"
+            "model": os.environ.get("MODEL_NAME", "gpt-4o-mini")
         }
-        
+
+    except subprocess.TimeoutExpired:
+        return {
+            "status": "timeout",
+            "error": "Baseline script timed out after 20 minutes",
+            "scores": {"easy": 0.0, "medium": 0.0, "hard": 0.0}
+        }
     except Exception as e:
         return {
             "status": "error",

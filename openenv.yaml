@@ -46,12 +46,12 @@ tasks:
     noise_level: 0.5
     time_span_days: 30
 
-# HF Spaces configuration
-app_port: 8000
+# HF Spaces configuration (uses port 7860)
+app_port: 7860
 app_file: server/app.py
 
 # OpenEnv metadata
-author: "Hackathon Participant"
+author: "Audumber Bhujang"
 license: "MIT"
 tags:
   - security

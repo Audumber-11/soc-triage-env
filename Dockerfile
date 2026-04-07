@@ -17,10 +17,9 @@ COPY . .
 # Set environment variables
 ENV PYTHONPATH=/app
 ENV PORT=7860
-ENV WORKERS=1
 
-# Expose port (HF Spaces standard)
+# HF Spaces uses port 7860
 EXPOSE 7860
 
-# Run server
+# Run server with single worker for session persistence
 CMD ["python", "-m", "uvicorn", "server.app:app", "--host", "0.0.0.0", "--port", "7860", "--workers", "1"]
